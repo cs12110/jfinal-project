@@ -1,8 +1,16 @@
 package com.pkgs.interceptor;
 
+import com.alibaba.fastjson.JSON;
 import com.jfinal.aop.Interceptor;
 import com.jfinal.aop.Invocation;
+import com.jfinal.plugin.redis.Cache;
+import com.jfinal.plugin.redis.Redis;
+import com.pkgs.conf.SysSetting;
 import com.pkgs.util.LogUtil;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * <p>
@@ -21,7 +29,12 @@ public class ServiceInterceptor implements Interceptor {
         Object target = invocation.getTarget();
         String methodName = invocation.getMethodName();
 
-        logger.mark(formatClassName(target.getClass()) + "#" + methodName);
+        String key = formatClassName(target.getClass()) + "#" + methodName;
+
+        logger.mark(key);
+
+        dealWithRedis(key);
+        getRedisValue();
 
         invocation.invoke();
     }
@@ -46,5 +59,33 @@ public class ServiceInterceptor implements Interceptor {
         }
 
         return clazzName;
+    }
+
+    private void dealWithRedis(String value) {
+        Cache cache = Redis.use(SysSetting.JFINAL_REDIS_KEY);
+
+        cache.sadd(SysSetting.SERVICE_SET_KEY, value);
+
+        String numStr = "1";
+        Object num = cache.hget(SysSetting.SYS_NAME, value);
+        if (null != num) {
+            numStr = String.valueOf(num);
+        }
+
+        cache.hset(SysSetting.SYS_NAME, value, Integer.parseInt(numStr) + 1);
+
+    }
+
+    private void getRedisValue() {
+        Cache cache = Redis.use(SysSetting.JFINAL_REDIS_KEY);
+        Set<?> members = cache.smembers(SysSetting.SERVICE_SET_KEY);
+
+        Map<String, String> map = new HashMap<>();
+        for (Object each : members) {
+            Object value = cache.hget(SysSetting.SYS_NAME, String.valueOf(each));
+            map.put(String.valueOf(each), String.valueOf(value));
+        }
+
+        logger.mark(JSON.toJSONString(map, true));
     }
 }

@@ -20,6 +20,7 @@ public class MyCtrl extends Controller {
     private ProductService service = Enhancer.enhance(ProductService.class);
 
     public void list() {
+
         List<Product> search = service.search();
 
         renderText(JSON.toJSONString(search));
